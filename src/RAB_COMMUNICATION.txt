@@ -1,0 +1,80 @@
+MODULE RAB_COMMUNICATION
+    RECORD bobby_record
+        !Custom data type
+        robtarget target;
+        speeddata speed;
+    ENDRECORD
+    
+    VAR bool receiving_points := TRUE;
+    VAR bool position_sent := FALSE;
+    VAR bool position_reached := FALSE;
+    
+    VAR bobby_record custom_data;
+    
+    !VAR robtarget received_pos;
+    VAR speeddata Speed_01 := [150, 150, 5000, 1000];
+    
+    VAR zonedata Zone_01 := [FALSE, 5, 0, 0, 0, 0, 0];
+    CONST robjoint HOME_Start_Joint_0 := [0, 15, -30, 0, 90, 0];
+    VAR jointtarget HOME_Start_0 := [HOME_Start_Joint_0, [9E9, 9E9, 9E9, 9E9, 9E9, 9E9]];
+    VAR intnum p_connectnum;
+    VAR intnum e_connectnum;
+    
+    PROC main()
+        ConfL\off;
+        ConfJ\off;
+        MoveAbsJ HOME_Start_0, Speed_01, Zone_01, tool0\WObj:=wobj0;
+        
+        CONNECT e_connectnum WITH RABMsgs;
+        IRMQMessage receiving_points, e_connectnum;
+        CONNECT p_connectnum WITH RABMsgs;
+        IRMQMessage custom_data, p_connectnum;
+        
+        WHILE receiving_points = TRUE DO
+            position_sent := FALSE;
+            WHILE position_sent = FALSE DO
+                WaitTime 3;
+            ENDWHILE
+            TPWrite "recieved position... ready for more ;D";
+            
+            
+        ENDWHILE
+       
+        IDelete e_connectnum;
+        IDelete p_connectnum;
+        EXIT;
+        
+    ENDPROC
+    TRAP RABMsgs
+        VAR rmqmessage msg;
+        VAR rmqheader header;
+        VAR rmqslot rabclient;
+        VAR num userdef;
+        VAR string tar := "Target Acquired";
+        VAR string ok := "Program End";
+        VAR string reached := "Target Reached, waiting for more...";
+        RMQGetMessage msg;
+        RMQGetMsgHeader msg \Header:=header
+            \SenderId:=rabclient\UserDef:=userdef;
+        !check data type and assign value to flag variable
+        
+        IF header.datatype = "bobby_record" THEN
+            RMQGetMsgData msg, custom_data;
+            position_sent := TRUE;
+            !return receipt to sender
+            RMQSendMessage rabclient, tar, \UserDef:=StrLen(tar);
+            MoveL custom_data.target, custom_data.speed, Zone_01, tool0\WObj:=wobj0;
+            RMQSendMessage rabclient, reached, \UserDef:=StrLen(reached);
+            
+        ELSEIF header.datatype = "bool" THEN
+            RMQGetMsgData msg, receiving_points;
+            position_sent := TRUE;
+            !return receipt to sender
+            RMQSendMessage rabclient, ok;
+            
+        ELSE
+            TPWrite "Unknown data received in PositionRABMsgs...";
+        ENDIF
+    ENDTRAP
+ENDMODULE
+
