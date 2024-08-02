@@ -1,2 +1,7 @@
-*/bin/
-*/bin-int/
+**/bin
+**/bin-int
+**/project
+
+.vs/
+*.sln
+*.suo

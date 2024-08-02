@@ -176,7 +176,7 @@ class RAB_COM
         //comm.CheckReturnMsg(); //Target Acquired
         //comm.CheckReturnMsg(); //Here boss
 
-        comm.SendMessage(new CustomDataTest(1809, -166, 1248, 150, 150, 5000, 1000));
+        //comm.SendMessage(new CustomDataTest(1809, -166, 1248, 150, 150, 5000, 1000));
         var send_mes = DateTime.Now;
 
         comm.CheckReturnMsg(); //Target Acquired
@@ -254,26 +254,27 @@ class RAB_COM
         //Send message to the RAPID queue
         ROB_Queue.Send(sendPositionMessage);
     }
-    public void SendMessage(CustomDataTest custom_data)
-    {
-        sendPositionMessage = new IpcMessage();
 
-        String string_to_send = $"target_data;[[[{custom_data.x},{custom_data.y},{custom_data.z}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{custom_data.tcp}, {custom_data.ori}, {custom_data.leax}, {custom_data.reax}]]";
-        int PaddingSize = MessageSize - string_to_send.Length;
+    //public void SendMessage(CustomDataTest custom_data)
+    //{
+    //    sendPositionMessage = new IpcMessage();
 
-        string_to_send = string_to_send.PadRight(PaddingSize, ' ');
+    //    String string_to_send = $"target_data;[[[{custom_data.x},{custom_data.y},{custom_data.z}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{custom_data.tcp}, {custom_data.ori}, {custom_data.leax}, {custom_data.reax}]]";
+    //    int PaddingSize = MessageSize - string_to_send.Length;
 
-        Console.WriteLine(string_to_send);      
+    //    string_to_send = string_to_send.PadRight(PaddingSize, ' ');
 
-        Byte[] data = new UTF8Encoding().GetBytes(string_to_send);
-        Console.WriteLine($"target Length:  {data.GetLength(0)}" );
-        //Place data and sender information in message
-        sendPositionMessage.SetData(data);
+    //    Console.WriteLine(string_to_send);      
+
+    //    Byte[] data = new UTF8Encoding().GetBytes(string_to_send);
+    //    Console.WriteLine($"target Length:  {data.GetLength(0)}" );
+    //    //Place data and sender information in message
+    //    sendPositionMessage.SetData(data);
         
-        sendPositionMessage.Sender = TheOneAndOnlyQueue.QueueId;
-        //Send message to the RAPID queue
-        ROB_Queue.Send(sendPositionMessage);
-    }
+    //    sendPositionMessage.Sender = TheOneAndOnlyQueue.QueueId;
+    //    //Send message to the RAPID queue
+    //    ROB_Queue.Send(sendPositionMessage);
+    //}
 
     private void CheckReturnMsg()
     {
