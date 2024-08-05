@@ -127,8 +127,8 @@ class RAB_COM
         RAB_COM comm = new RAB_COM();
 
         //Get controller
-        //comm.controller = GetController(NetworkScannerSearchCriterias.Virtual);
-        comm.controller = GetController(NetworkScannerSearchCriterias.Real);
+        comm.controller = GetController(NetworkScannerSearchCriterias.Virtual);
+        //comm.controller = GetController(NetworkScannerSearchCriterias.Real);
 
         //get T_ROB1 queue to send msgs to RAPID task
         comm.ROB_Queue = comm.controller.Ipc.GetQueue("RMQ_T_ROB1");
@@ -172,17 +172,12 @@ class RAB_COM
         //comm.CheckReturnMsg(); //Target Acquired
         //comm.CheckReturnMsg(); //Here boss
 
-        //comm.SendMessage(new Point(1809, -166, 1248));
-        //comm.CheckReturnMsg(); //Target Acquired
-        //comm.CheckReturnMsg(); //Here boss
-
-        //comm.SendMessage(new CustomDataTest(1809, -166, 1248, 150, 150, 5000, 1000));
+        comm.SendMessage(new Point(1809, -166, 500), Rotation.Default);
         var send_mes = DateTime.Now;
-
         comm.CheckReturnMsg(); //Target Acquired
         var rec_mes = DateTime.Now;
 
-        Console.WriteLine($"That took: {rec_mes-send_mes}");
+        Console.WriteLine($"That took: {(rec_mes-send_mes).Milliseconds}");
 
         comm.CheckReturnMsg(); //Here boss
 

@@ -1,5 +1,5 @@
 MODULE RAB_COMMUNICATION
-    RECORD bobby_record
+    RECORD target_speed_data
         !Custom data type
         robtarget target;
         speeddata speed;
@@ -9,7 +9,8 @@ MODULE RAB_COMMUNICATION
     VAR bool position_sent := FALSE;
     VAR bool position_reached := FALSE;
     
-    VAR bobby_record custom_data;
+    VAR target_speed_data ts_data;
+    VAR robtarget target_data;
     
     !VAR robtarget received_pos;
     VAR speeddata Speed_01 := [150, 150, 5000, 1000];
@@ -17,31 +18,34 @@ MODULE RAB_COMMUNICATION
     VAR zonedata Zone_01 := [FALSE, 5, 0, 0, 0, 0, 0];
     CONST robjoint HOME_Start_Joint_0 := [0, 15, -30, 0, 90, 0];
     VAR jointtarget HOME_Start_0 := [HOME_Start_Joint_0, [9E9, 9E9, 9E9, 9E9, 9E9, 9E9]];
-    VAR intnum p_connectnum;
-    VAR intnum e_connectnum;
+    
+    VAR intnum target_speed_connectnum;
+    VAR intnum target_connectnum;
+    VAR intnum exit_connectnum;
     
     PROC main()
         ConfL\off;
         ConfJ\off;
         MoveAbsJ HOME_Start_0, Speed_01, Zone_01, tool0\WObj:=wobj0;
         
-        CONNECT e_connectnum WITH RABMsgs;
-        IRMQMessage receiving_points, e_connectnum;
-        CONNECT p_connectnum WITH RABMsgs;
-        IRMQMessage custom_data, p_connectnum;
+        CONNECT exit_connectnum WITH RABMsgs;
+        IRMQMessage receiving_points, exit_connectnum;
+        CONNECT target_connectnum WITH RABMsgs;
+        IRMQMessage target_data, target_connectnum;
+        CONNECT target_speed_connectnum WITH RABMsgs;
+        IRMQMessage ts_data, target_speed_connectnum;
         
         WHILE receiving_points = TRUE DO
             position_sent := FALSE;
             WHILE position_sent = FALSE DO
                 WaitTime 3;
             ENDWHILE
-            TPWrite "recieved position... ready for more ;D";
-            
             
         ENDWHILE
        
-        IDelete e_connectnum;
-        IDelete p_connectnum;
+        IDelete exit_connectnum;
+        IDelete target_connectnum;
+        IDelete target_speed_connectnum;
         EXIT;
         
     ENDPROC
@@ -50,20 +54,28 @@ MODULE RAB_COMMUNICATION
         VAR rmqheader header;
         VAR rmqslot rabclient;
         VAR num userdef;
-        VAR string tar := "Target Acquired";
+        VAR string tar := "Target Received";
         VAR string ok := "Program End";
-        VAR string reached := "Target Reached, waiting for more...";
+        VAR string reached := "Target Reached, waiting...";
         RMQGetMessage msg;
         RMQGetMsgHeader msg \Header:=header
             \SenderId:=rabclient\UserDef:=userdef;
         !check data type and assign value to flag variable
         
-        IF header.datatype = "bobby_record" THEN
-            RMQGetMsgData msg, custom_data;
+        IF header.datatype = "target_speed_data" THEN
+            RMQGetMsgData msg, ts_data;
             position_sent := TRUE;
             !return receipt to sender
             RMQSendMessage rabclient, tar, \UserDef:=StrLen(tar);
-            MoveL custom_data.target, custom_data.speed, Zone_01, tool0\WObj:=wobj0;
+            MoveL ts_data.target, ts_data.speed, Zone_01, tool0\WObj:=wobj0;
+            RMQSendMessage rabclient, reached, \UserDef:=StrLen(reached);
+            
+        ELSEIF header.datatype = "robtarget" THEN
+            RMQGetMsgData msg, target_data;
+            position_sent := TRUE;
+            !return receipt to sender
+            RMQSendMessage rabclient, tar, \UserDef:=StrLen(tar);
+            MoveL target_data, Speed_01, Zone_01, tool0\WObj:=wobj0;
             RMQSendMessage rabclient, reached, \UserDef:=StrLen(reached);
             
         ELSEIF header.datatype = "bool" THEN
@@ -77,4 +89,3 @@ MODULE RAB_COMMUNICATION
         ENDIF
     ENDTRAP
 ENDMODULE
-
