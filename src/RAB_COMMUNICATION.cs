@@ -7,6 +7,36 @@ using System.Globalization;
 using System.Text;
 using System.Windows.Forms;
 
+enum ControllerType
+{
+    Real,
+    Virtual,
+    None
+}
+
+internal class Utils
+{
+    public static NetworkScannerSearchCriterias ConvertControllerType(ControllerType type) 
+    {
+        switch (type)
+        {
+            case ControllerType.Real:
+                return NetworkScannerSearchCriterias.Real;
+
+            case ControllerType.Virtual:
+                return NetworkScannerSearchCriterias.Virtual;
+
+            default:
+                return NetworkScannerSearchCriterias.None;
+        }
+    }
+}
+
+internal interface ISendable 
+{
+     String GetMessage();
+}
+
 struct Point
 {
     public float x;
@@ -40,7 +70,7 @@ struct Rotation
     public static Rotation Default => new Rotation(0.0f, 1.0f, 0.0f, 0.0f);
 }
 
-struct Target
+struct Target : ISendable
 {
     public Point pos;
     public Rotation ort;
@@ -57,7 +87,7 @@ struct Target
         ort = Rotation.Default;
     }
 
-    public override String ToString()
+    public String GetMessage()
     {
         // Hardcoded for now
         return $"robtarget;[[{pos.x},{pos.y},{pos.z}],[{ort.x},{ort.y},{ort.z},{ort.w}],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]]";
@@ -80,7 +110,7 @@ struct SpeedData
     }
 }
 
-struct TargetSpeedData
+struct TargetSpeedData : ISendable
 {
     public Point pos;
     public Rotation ort;
@@ -99,7 +129,7 @@ struct TargetSpeedData
         ort = Rotation.Default;
         speed_data = _sd;
     }
-    public override String ToString()
+    public String GetMessage()
     {
         // Hardcoded for now
         return $"target_speed_data;[[[{pos.x},{pos.y},{pos.z}],[{ort.x},{ort.y},{ort.z},{ort.w}],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{speed_data.tcp}, {speed_data.ori}, {speed_data.leax}, {speed_data.reax}]]";
@@ -108,177 +138,144 @@ struct TargetSpeedData
 
 class RAB_COM
 {
-    public Controller controller;
-    public IpcQueue Robot_Queue;
+    // Controller
+    public Controller Controller;
 
-    public IpcQueue SDK_Queue;
+    // Queues
+    private IpcQueue Robot_Queue;
+    private IpcQueue SDK_Queue;
 
-    public IpcMessage sendPositionMessage;
+    // Messages
+    private IpcMessage PositionMessage;
+    private IpcMessage ExitMessage;
+    private IpcMessage ReturnMessage;
 
-    public IpcMessage sendExitMessage;
+    private int MessageSize;
+    private bool MovingToTarget = false;
+    private int ReturnMessageCount = 0;
 
-    public IpcMessage returnMessage;
+    // Target sent events
+    public event EventHandler TargetSent;
 
-    public int MessageSize;
-   
-    /// <summary>
-    /// The main entry point for the application.
-    /// </summary>
-    [MTAThread]
-    static void Main(string[] args)
+    protected virtual void OnTargetSent(EventArgs e)
     {
-        RAB_COM comm = new RAB_COM();
+        TargetSent?.Invoke(this, e);
+    }
 
-        //Get controller
-        //comm.controller = GetController(NetworkScannerSearchCriterias.Virtual);
-        comm.controller = GetController(NetworkScannerSearchCriterias.Real);
+    // Target reached event
+    public event EventHandler TargetReached;
 
-        //get T_ROB1 queue to send msgs to RAPID task
-        comm.Robot_Queue = comm.controller.Ipc.GetQueue("RMQ_T_ROB1");
-        comm.MessageSize = Ipc.MaxMessageSize;
+    protected virtual void OnTargetReached(EventArgs e)
+    {
+        TargetReached?.Invoke(this, e);
+    }
 
-        if (!comm.controller.Ipc.Exists("RMQ_SDK"))
+    public RAB_COM(ControllerType type)
+    {
+        // Set up controller
+        this.Controller = GetController(type);
+
+        // Set up robot queue
+        this.Robot_Queue = this.Controller.Ipc.GetQueue("RMQ_T_ROB1");
+        this.MessageSize = this.Controller.Ipc.GetMaximumMessageSize();
+
+        // Set up SDK queue
+        if (!this.Controller.Ipc.Exists("RMQ_SDK"))
         {
-            comm.SDK_Queue = comm.controller.Ipc.CreateQueue("RMQ_SDK", 10, comm.MessageSize);
+            this.SDK_Queue = this.Controller.Ipc.CreateQueue("RMQ_SDK", 10, this.MessageSize);
         }
         else
         {
             // If the queue already exists, delete it and recreate it
-            comm.controller.Ipc.DeleteQueue(comm.controller.Ipc.GetQueueId("RMQ_SDK"));
-            comm.SDK_Queue = comm.controller.Ipc.CreateQueue("RMQ_SDK", 10, comm.MessageSize);
+            this.Controller.Ipc.DeleteQueue(this.Controller.Ipc.GetQueueId("RMQ_SDK"));
+            this.SDK_Queue = this.Controller.Ipc.CreateQueue("RMQ_SDK", 10, this.MessageSize);
         }
 
-        var queue_name = comm.SDK_Queue.Name;
-        var queue_id = comm.SDK_Queue.QueueId;
-        var capacity = comm.SDK_Queue.Capacity;
-        var messagesize = comm.SDK_Queue.MessageSizeLimit;
 
-        Console.WriteLine($"Queue {queue_name}:{queue_id}:{capacity}:{messagesize}");
-
-        //Create IpcMessage objects for sending and receiving
-        comm.sendExitMessage = new IpcMessage();
-
-        ////Create a return message
-        //comm.sendPositionMessage = new IpcMessage();
-
-        ////Create a return message
-        //comm.returnMessage = new IpcMessage();
-
-        ////in an event handler, eg. button_Click
-        //comm.SendMessage(new Point(1809, -166, 1248));
-        //comm.CheckReturnMsg(); //Target Acquired
-        //comm.CheckReturnMsg(); //Here boss
-
-        //comm.SendMessage(new Point(1809, -166, 450));
-        //comm.CheckReturnMsg(); //Target Acquired
-        //comm.CheckReturnMsg(); //Here boss
-
-        //comm.SendMessage(new Point(1809, -166, 1248));
-        //comm.CheckReturnMsg(); //Target Acquired
-        //comm.CheckReturnMsg(); //Here boss
-
-        //comm.SendMessage(new CustomDataTest(1809, -166, 1248, 150, 150, 5000, 1000));
-        var send_mes = DateTime.Now;
-
-        comm.CheckReturnMsg();
-        var rec_mes = DateTime.Now;
-
-        Console.WriteLine($"That took: {rec_mes-send_mes}");
-
-        comm.CheckReturnMsg();
-
-        //comm.SendMessage(false);
-        //comm.CheckReturnMsg();
-
-        Console.ReadLine();
+#if DEBUG
+        // Debug
+        Console.WriteLine($"SDK Queue {this.SDK_Queue.Name}:{this.SDK_Queue.QueueId}:{this.SDK_Queue.Capacity}:{this.SDK_Queue.MessageSizeLimit}");
+#endif
     }
-
-    static Controller GetController(NetworkScannerSearchCriterias type)
+   
+    private static Controller GetController(ControllerType type)
     {
         NetworkScanner scanner = new NetworkScanner();
         //Assume single controller
-        var controller_info = scanner.GetControllers(type)[0];
+        var controller_info = scanner.GetControllers(Utils.ConvertControllerType(type))[0];
         var controller_id = controller_info.SystemId;
         Controller cntr = Controller.Connect(controller_id, ConnectionType.Standalone);
         Console.WriteLine("I found a controller named: {0}", controller_info.SystemName);
         return cntr;
     }
 
-    public void SendMessage(bool boolMsg)
+    public void SendExitMessage()
     {
-        Byte[] data = null;
+        this.ExitMessage = new IpcMessage();
 
-        var yes = "bool;TRUE\0";
-        var no = "bool;FALSE\0";
-
+        var exit = "bool;FALSE\0";
 
         //Create message data
-        if (boolMsg)
-        {
-            data = new UTF8Encoding().GetBytes(yes);
-            Console.WriteLine(yes);
-        }
-        else
-        {
-            data = new UTF8Encoding().GetBytes(no);
-            Console.WriteLine(no);
-        }
+        Byte[] data = new UTF8Encoding().GetBytes(exit);
 
+        // Debug
+#if DEBUG
+        Console.WriteLine(exit);
         Console.WriteLine($"Data Size: {data.GetLength(0)}");
+#endif
 
         //Place data and sender information in message
-        sendExitMessage.SetData(data);
-        sendExitMessage.Sender = SDK_Queue.QueueId;
+        this.ExitMessage.SetData(data);
+        this.ExitMessage.Sender = SDK_Queue.QueueId;
         //Send message to the RAPID queue
-        Robot_Queue.Send(sendExitMessage);
+        Robot_Queue.Send(this.ExitMessage);
     }
 
-    public void SendMessage(Point point, Rotation rot)
+    private void SendMessageImpl(ref Byte[] bytes)
     {
-        sendPositionMessage = new IpcMessage();
+        // Debug
+#if DEBUG
+        Console.WriteLine($"Data length: {bytes.GetLength(0)}");
+#endif
 
-        String string_to_send = $"robtarget;[[{point.x},{point.y},{point.z}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]]";
-        int PaddingSize = MessageSize - string_to_send.Length;
+        // Set message data
+        this.PositionMessage.SetData(bytes);
 
-        //Pad message to max size
-        string_to_send = string_to_send.PadRight(PaddingSize, ' ');
+        // Set message sender
+        this.PositionMessage.Sender = SDK_Queue.QueueId;
 
+        // Send message to the RAPID queue
+        Robot_Queue.Send(this.PositionMessage);
+    }
+
+    private void PadMessage(ref String message)
+    {
+        int PaddingSize = MessageSize - message.Length;
+        message = message.PadRight(PaddingSize, ' ');
+    }
+
+    public void SendMessage(ISendable target)
+    {
+        this.PositionMessage = new IpcMessage();
+
+        String string_to_send = target.GetMessage();
+        PadMessage(ref string_to_send);
+
+#if DEBUG
         Console.WriteLine(string_to_send);      
+#endif
 
+        // Convert to byte representation
         Byte[] data = new UTF8Encoding().GetBytes(string_to_send);
-        Console.WriteLine($"target Length:  {data.GetLength(0)}" );
-        //Place data and sender information in message
-        sendPositionMessage.SetData(data);
+        SendMessageImpl(ref data);
 
-        sendPositionMessage.Sender = SDK_Queue.QueueId;
-        //Send message to the RAPID queue
-        Robot_Queue.Send(sendPositionMessage);
+        OnTargetSent(EventArgs.Empty);
+        MovingToTarget = true;
     }
 
-    //public void SendMessage(CustomDataTest custom_data)
-    //{
-    //    sendPositionMessage = new IpcMessage();
-
-    //    String string_to_send = $"target_data;[[[{custom_data.x},{custom_data.y},{custom_data.z}],[0,1,0,0],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{custom_data.tcp}, {custom_data.ori}, {custom_data.leax}, {custom_data.reax}]]";
-    //    int PaddingSize = MessageSize - string_to_send.Length;
-
-    //    string_to_send = string_to_send.PadRight(PaddingSize, ' ');
-
-    //    Console.WriteLine(string_to_send);      
-
-    //    Byte[] data = new UTF8Encoding().GetBytes(string_to_send);
-    //    Console.WriteLine($"target Length:  {data.GetLength(0)}" );
-    //    //Place data and sender information in message
-    //    sendPositionMessage.SetData(data);
-        
-    //    sendPositionMessage.Sender = TheOneAndOnlyQueue.QueueId;
-    //    //Send message to the RAPID queue
-    //    ROB_Queue.Send(sendPositionMessage);
-    //}
-
-    private void CheckReturnMsg()
+    public void CheckReturnMsg()
     {
-        returnMessage = new IpcMessage();
+        this.ReturnMessage = new IpcMessage();
 
         IpcReturnType ret = IpcReturnType.Timeout;
         string answer = string.Empty;
@@ -287,13 +284,19 @@ class RAB_COM
         do
         {
             Console.WriteLine("Trying to get message");
-            ret = SDK_Queue.Receive(timeout, returnMessage);
+            ret = SDK_Queue.Receive(timeout, this.ReturnMessage);
         } while (ret != IpcReturnType.OK);
 
-        var string_length = returnMessage.UserDef+9;
+        var string_length = this.ReturnMessage.UserDef+9;
         Console.WriteLine(string_length);
-        answer = new UTF8Encoding().GetString(returnMessage.Data, 0, string_length);
+        answer = new UTF8Encoding().GetString(this.ReturnMessage.Data, 0, string_length);
         answer = answer.Replace("string;", "");
+
+        if(++ReturnMessageCount > 1)
+        {
+            OnTargetReached(EventArgs.Empty);
+            ReturnMessageCount = 0;
+        }
 
         Console.WriteLine(answer);
     }
