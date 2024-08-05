@@ -151,7 +151,6 @@ class RAB_COM
     private IpcMessage ReturnMessage;
 
     private int MessageSize;
-    private bool MovingToTarget = false;
     private int ReturnMessageCount = 0;
 
     // Target sent events
@@ -231,23 +230,6 @@ class RAB_COM
         Robot_Queue.Send(this.ExitMessage);
     }
 
-    private void SendMessageImpl(ref Byte[] bytes)
-    {
-        // Debug
-#if DEBUG
-        Console.WriteLine($"Data length: {bytes.GetLength(0)}");
-#endif
-
-        // Set message data
-        this.PositionMessage.SetData(bytes);
-
-        // Set message sender
-        this.PositionMessage.Sender = SDK_Queue.QueueId;
-
-        // Send message to the RAPID queue
-        Robot_Queue.Send(this.PositionMessage);
-    }
-
     private void PadMessage(ref String message)
     {
         int PaddingSize = MessageSize - message.Length;
@@ -267,10 +249,17 @@ class RAB_COM
 
         // Convert to byte representation
         Byte[] data = new UTF8Encoding().GetBytes(string_to_send);
-        SendMessageImpl(ref data);
 
+        // Set message data
+        this.PositionMessage.SetData(data);
+
+        // Set message sender
+        this.PositionMessage.Sender = SDK_Queue.QueueId;
+
+        // Send message to the RAPID queue
+        Robot_Queue.Send(this.PositionMessage);
+        
         OnTargetSent(EventArgs.Empty);
-        MovingToTarget = true;
     }
 
     public void CheckReturnMsg()

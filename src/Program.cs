@@ -11,7 +11,7 @@ class Program
     [MTAThread]
     static void Main(string[] args)
     {
-        RAB_COM comm = new RAB_COM(ControllerType.Real);
+        RAB_COM comm = new RAB_COM(ControllerType.Virtual);
 
         comm.TargetReached+=OnTargetReached;
 
@@ -28,6 +28,6 @@ class Program
 
     static void OnTargetReached(object sender, EventArgs e)
     {
-        Console.WriteLine("Target Reached");
+        Console.WriteLine("Event Target Reached");
     }
 }
