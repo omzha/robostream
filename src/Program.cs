@@ -14,16 +14,19 @@ class Program
         RAB_COM comm = new RAB_COM(ControllerType.Virtual);
 
         comm.TargetReached+=OnTargetReached;
+        comm.TargetSent+=OnTargetSent;
 
         comm.SendMessage(new Target(new Point(1809, -166, 1248)));
-        comm.CheckReturnMsg(); // Target received
-        comm.CheckReturnMsg(); // Arrived at target
 
         comm.SendExitMessage();
-        comm.CheckReturnMsg();
 
         //Pause before exit
         Console.ReadLine();
+    }
+
+    static void OnTargetSent(object sender, EventArgs e)
+    {
+        Console.WriteLine("Event Target Sent");
     }
 
     static void OnTargetReached(object sender, EventArgs e)

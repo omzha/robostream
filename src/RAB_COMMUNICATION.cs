@@ -3,138 +3,9 @@ using ABB.Robotics.Controllers.Discovery;
 using ABB.Robotics.Controllers.Messaging;
 //using ABB.Robotics.Controllers.RapidDomain;
 using System;
-using System.Globalization;
 using System.Text;
-using System.Windows.Forms;
+using System.Diagnostics;
 
-enum ControllerType
-{
-    Real,
-    Virtual,
-    None
-}
-
-internal class Utils
-{
-    public static NetworkScannerSearchCriterias ConvertControllerType(ControllerType type) 
-    {
-        switch (type)
-        {
-            case ControllerType.Real:
-                return NetworkScannerSearchCriterias.Real;
-
-            case ControllerType.Virtual:
-                return NetworkScannerSearchCriterias.Virtual;
-
-            default:
-                return NetworkScannerSearchCriterias.None;
-        }
-    }
-}
-
-internal interface ISendable 
-{
-     String GetMessage();
-}
-
-struct Point
-{
-    public float x;
-    public float y;
-    public float z;
-
-    public Point(float _x, float _y, float _z)
-    {
-        x = _x;
-        y = _y;
-        z = _z;
-    }
-}
-
-struct Rotation
-{
-    public float x;
-    public float y;
-    public float z;
-    public float w;
-
-    public Rotation(float _x, float _y, float _z, float _w)
-    {
-        x = _x;
-        y = _y;
-        z = _z;
-        w = _w;
-    }
-
-    // Hardcoded for now
-    public static Rotation Default => new Rotation(0.0f, 1.0f, 0.0f, 0.0f);
-}
-
-struct Target : ISendable
-{
-    public Point pos;
-    public Rotation ort;
-
-    public Target(Point _pos, Rotation _ort)
-    {
-        pos = _pos;
-        ort = _ort;
-    }
-
-    public Target(Point _pos)
-    {
-        pos = _pos;
-        ort = Rotation.Default;
-    }
-
-    public String GetMessage()
-    {
-        // Hardcoded for now
-        return $"robtarget;[[{pos.x},{pos.y},{pos.z}],[{ort.x},{ort.y},{ort.z},{ort.w}],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]]";
-    }
-}
-
-struct SpeedData
-{
-    public int tcp;
-    public int ori;
-    public int leax;
-    public int reax;
-
-    public SpeedData(int _tcp, int _ori, int _leax, int _reax)
-    {
-        tcp = _tcp;
-        ori = _ori;
-        leax = _leax;
-        reax = _reax;
-    }
-}
-
-struct TargetSpeedData : ISendable
-{
-    public Point pos;
-    public Rotation ort;
-    public SpeedData speed_data;
-
-    public TargetSpeedData(Point _pos, Rotation _ort, SpeedData _sd)
-    {
-        pos = _pos;
-        ort = _ort;
-        speed_data = _sd;
-    }
-
-    public TargetSpeedData(Point _pos, SpeedData _sd)
-    {
-        pos = _pos;
-        ort = Rotation.Default;
-        speed_data = _sd;
-    }
-    public String GetMessage()
-    {
-        // Hardcoded for now
-        return $"target_speed_data;[[[{pos.x},{pos.y},{pos.z}],[{ort.x},{ort.y},{ort.z},{ort.w}],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{speed_data.tcp}, {speed_data.ori}, {speed_data.leax}, {speed_data.reax}]]";
-    }
-}
 
 class RAB_COM
 {
@@ -151,12 +22,20 @@ class RAB_COM
     private IpcMessage ReturnMessage;
 
     private int MessageSize;
-    private int ReturnMessageCount = 0;
+    private byte ReturnMessageCount = 0;
 
-    // Target sent events
+    // Target sent event
     public event EventHandler TargetSent;
 
     protected virtual void OnTargetSent(EventArgs e)
+    {
+        TargetSent?.Invoke(this, e);
+    }
+
+    // Target received event
+    public event EventHandler TargetReceived;
+
+    protected virtual void OnTargetReceived(EventArgs e)
     {
         TargetSent?.Invoke(this, e);
     }
@@ -259,10 +138,17 @@ class RAB_COM
         // Send message to the RAPID queue
         Robot_Queue.Send(this.PositionMessage);
         
+        // Issue event
         OnTargetSent(EventArgs.Empty);
+
+        // OnTargetReceived
+        CheckReturnMsg();
+
+        // OnTargetReached
+        CheckReturnMsg();
     }
 
-    public void CheckReturnMsg()
+    private void CheckReturnMsg()
     {
         this.ReturnMessage = new IpcMessage();
 
@@ -272,7 +158,7 @@ class RAB_COM
         //Check for msg in the PC SDK queue
         do
         {
-            Console.WriteLine("Trying to get message");
+            //Console.WriteLine("Trying to get message");
             ret = SDK_Queue.Receive(timeout, this.ReturnMessage);
         } while (ret != IpcReturnType.OK);
 
@@ -281,12 +167,21 @@ class RAB_COM
         answer = new UTF8Encoding().GetString(this.ReturnMessage.Data, 0, string_length);
         answer = answer.Replace("string;", "");
 
-        if(++ReturnMessageCount > 1)
+        if (ReturnMessageCount == 0 )
+        {
+            OnTargetReceived(EventArgs.Empty);
+        }
+        else if (ReturnMessageCount == 1)
         {
             OnTargetReached(EventArgs.Empty);
-            ReturnMessageCount = 0;
+        }
+        else
+        {
+            Debugger.Break();
         }
 
+#if DEBUG
         Console.WriteLine(answer);
+#endif
     }
 }

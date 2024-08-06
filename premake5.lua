@@ -4,6 +4,16 @@ workspace "robostream"
 
     configurations {"Debug", "Release"}
 
+    filter {"configurations:*Debug*"}
+        defines {"DEBUG"}
+        optimize "Off"
+    filter {}
+
+    filter {"configurations:*Release*"}
+        optimize "On"
+        warnings "Off"
+    filter {}
+
     project "robostream"
         location "project"
         kind "ConsoleApp"
@@ -17,10 +27,6 @@ workspace "robostream"
         {
             "src/**.cs"
         }
-
-        filter {"files:**Program.cs"}
-            buildaction "None"
-        filter {}
 
         libdirs
         {
