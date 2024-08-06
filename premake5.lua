@@ -35,7 +35,9 @@ workspace "robostream"
 
         links
         {
+            "System",
             "System.Windows.Forms",
+            "System.Text.RegularExpressions",
             "ABB.Robotics.Controllers.PC.dll"
         }
 
