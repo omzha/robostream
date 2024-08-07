@@ -14,9 +14,9 @@ class Program
     [MTAThread]
     static void Main(string[] args)
     {
-        var path = "C:\\Users\\Vlad.Levyant\\Downloads\\point stream_01.txt";
+        var path = "C:\\Users\\Oliver.Moldow\\Downloads\\point stream_03.txt";
 
-        var pattern = @"MoveL \[\[([\d., -]+)\], \[([\d., -]+)\]";
+        var pattern = @"[/s]*MoveL \[\[([\d., -]+)\], \[([\d., -]+)\]";
 
         Regex rg = new Regex(pattern);
 
@@ -32,15 +32,17 @@ class Program
                 var pos_str = match.Groups[1].Captures[0].ToString();
                 var ort_str = match.Groups[2].Captures[0].ToString();
 
-                Console.WriteLine($"[{pos_str}], [{ort_str}]");
+                //Console.WriteLine($"[{pos_str}], [{ort_str}]");
 
                 targets.Add(new Target(ParsePoint(ref pos_str), ParseOrt(ref ort_str)));
 
-                Console.WriteLine(targets[targets.Count - 1].GetMessage());
+                //Console.WriteLine(targets[targets.Count - 1].GetMessage());
             }
         }
 
         RAB_COM com = new RAB_COM(ControllerType.Real);
+
+        Console.WriteLine("I connected to {0}", com.Controller.SystemName);
 
         com.TargetSent += OnTargetSent;
         com.TargetReceived += OnTargetReceived;
@@ -51,7 +53,7 @@ class Program
         foreach (var tar in targets)
         {
             com.SendMessage(tar);
-            Console.WriteLine($"{((++count/targets.Count) * 100).ToString("0.00")}%");
+            Console.WriteLine($"{++count} of {targets.Count} - {(((float)count / targets.Count) * 100.0).ToString("F3")}%");
         }
 
         com.SendExitMessage();

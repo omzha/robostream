@@ -37,7 +37,7 @@ class RAB_COM
 
     protected virtual void OnTargetReceived(TargetEventArgs e)
     {
-        TargetSent?.Invoke(this, e);
+        TargetReceived?.Invoke(this, e);
     }
 
     // Target reached event
@@ -165,7 +165,6 @@ class RAB_COM
         } while (ret != IpcReturnType.OK);
 
         var string_length = this.ReturnMessage.UserDef+9;
-        Console.WriteLine(string_length);
         answer = new UTF8Encoding().GetString(this.ReturnMessage.Data, 0, string_length);
         answer = answer.Replace("string;", "");
 

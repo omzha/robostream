@@ -48,6 +48,42 @@ struct Point
     }
 }
 
+struct Joint
+{
+    public float a1;
+    public float a2;
+    public float a3;
+    public float a4;
+    public float a5;
+    public float a6;
+
+    public Joint(float _a1, float _a2, float _a3, float _a4, float _a5, float _a6)
+    {
+        a1 = _a1;
+        a2 = _a2;
+        a3 = _a3;
+        a4 = _a4;
+        a5 = _a5;
+        a6 = _a6;
+    }
+
+}
+
+struct JointTarget : ISendable
+{
+    public Joint joint;
+
+    public JointTarget(Joint _joint)
+    {
+        joint = _joint;
+    }
+
+    public String GetMessage()
+    {
+        return $"jointtarget;[[{joint.a1},{joint.a2},{joint.a3},{joint.a4},{joint.a5},{joint.a6}],[9E9,9E9,9E9,9E9,9E9,9E9]]";
+    }
+}
+
 struct Rotation
 {
     public float x;
