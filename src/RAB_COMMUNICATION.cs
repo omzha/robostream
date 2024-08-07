@@ -25,25 +25,25 @@ class RAB_COM
     private byte ReturnMessageCount = 0;
 
     // Target sent event
-    public event EventHandler TargetSent;
+    public event EventHandler<TargetEventArgs> TargetSent;
 
-    protected virtual void OnTargetSent(EventArgs e)
+    protected virtual void OnTargetSent(TargetEventArgs e)
     {
         TargetSent?.Invoke(this, e);
     }
 
     // Target received event
-    public event EventHandler TargetReceived;
+    public event EventHandler<TargetEventArgs> TargetReceived;
 
-    protected virtual void OnTargetReceived(EventArgs e)
+    protected virtual void OnTargetReceived(TargetEventArgs e)
     {
         TargetSent?.Invoke(this, e);
     }
 
     // Target reached event
-    public event EventHandler TargetReached;
+    public event EventHandler<TargetEventArgs> TargetReached;
 
-    protected virtual void OnTargetReached(EventArgs e)
+    protected virtual void OnTargetReached(TargetEventArgs e)
     {
         TargetReached?.Invoke(this, e);
     }
@@ -138,14 +138,16 @@ class RAB_COM
         // Send message to the RAPID queue
         Robot_Queue.Send(this.PositionMessage);
         
-        // Issue event
-        OnTargetSent(EventArgs.Empty);
+        // OnTargetSent
+        OnTargetSent(new TargetEventArgs {Target = target.GetMessage()});
 
         // OnTargetReceived
         CheckReturnMsg();
+        OnTargetReceived(new TargetEventArgs {Target = target.GetMessage()});
 
         // OnTargetReached
         CheckReturnMsg();
+        OnTargetReached(new TargetEventArgs {Target = target.GetMessage()});
     }
 
     private void CheckReturnMsg()
@@ -166,19 +168,6 @@ class RAB_COM
         Console.WriteLine(string_length);
         answer = new UTF8Encoding().GetString(this.ReturnMessage.Data, 0, string_length);
         answer = answer.Replace("string;", "");
-
-        if (ReturnMessageCount == 0 )
-        {
-            OnTargetReceived(EventArgs.Empty);
-        }
-        else if (ReturnMessageCount == 1)
-        {
-            OnTargetReached(EventArgs.Empty);
-        }
-        else
-        {
-            Debugger.Break();
-        }
 
 #if DEBUG
         Console.WriteLine(answer);

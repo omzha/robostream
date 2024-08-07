@@ -22,6 +22,7 @@ class Program
 
         List<Target> targets = new List<Target>();
 
+        // Read in the list of points
         var lines = File.ReadLines(path);
         foreach (var line in lines)
         {
@@ -41,12 +42,36 @@ class Program
 
         RAB_COM com = new RAB_COM(ControllerType.Real);
 
+        com.TargetSent += OnTargetSent;
+        com.TargetReceived += OnTargetReceived;
+        com.TargetReached += OnTargetReached;
+
+        int count = 0;
+
         foreach (var tar in targets)
         {
             com.SendMessage(tar);
+            Console.WriteLine($"{((++count/targets.Count) * 100).ToString("0.00")}%");
         }
 
         com.SendExitMessage();
+    }
+
+    static void OnTargetSent(object sender, TargetEventArgs e)
+    {
+        Console.WriteLine($"Sent Target: {e.Target}");
+    }
+
+    static void OnTargetReceived(object sender, TargetEventArgs e)
+    {
+        Console.WriteLine($"Received Target: {e.Target}");
+    }
+
+    static void OnTargetReached(object sender, TargetEventArgs e)
+    {
+        Console.WriteLine($"Reached Target: {e.Target}");
+        Console.WriteLine();
+        Console.WriteLine();
     }
 
     static public Point ParsePoint(ref String input)

@@ -132,3 +132,8 @@ struct TargetSpeedData : ISendable
         return $"target_speed_data;[[[{pos.x},{pos.y},{pos.z}],[{ort.x},{ort.y},{ort.z},{ort.w}],[0,0,0,0],[9E9,9E9,9E9,9E9,9E9,9E9]],[{speed_data.tcp}, {speed_data.ori}, {speed_data.leax}, {speed_data.reax}]]";
     }
 }
+
+public class TargetEventArgs : EventArgs
+{
+    public String Target {get; set;}
+}
